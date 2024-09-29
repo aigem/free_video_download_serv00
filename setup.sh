@@ -11,12 +11,17 @@ DEFAULT_FRAMEWORK="nodejs"
 GIT_REPO="https://github.com/saotv/cobalt.git"
 GIT_REPO_DIR="cobalt"
 NODE_Version="20"
+setup_log="$USER_HOME/$PROJECT_NAME/setup_log.txt"
 
 # 创建目录
 create_directories() {
     print_color $BLUE "创建必要的目录..."
-    mkdir -p "$USER_HOME/$PROJECT_NAME"
-    touch "$setup_log"
+    if [ ! -d "$USER_HOME/$PROJECT_NAME" ]; then
+        mkdir -p "$USER_HOME/$PROJECT_NAME"
+    fi
+    if [ ! -d "$setup_log" ]; then
+        touch "$setup_log"
+    fi
     log_message "新建目录: $USER_HOME/$PROJECT_NAME"
     
 }
@@ -42,8 +47,7 @@ setup_project() {
     CONFIG_FILE="$USER_HOME/$PROJECT_NAME/src/config.sh"
     REBOOT_SCRIPT_PATH="$USER_HOME/$PROJECT_NAME/src/reboot_run.sh"
     VIRTUAL_ENV_PATH="$USER_HOME/$PROJECT_NAME/venv_$PROJECT_NAME"
-    setup_log="$USER_HOME/$PROJECT_NAME/setup_log.txt"
-
+    
     log_message "项目设置完成，开始一键安装$PROJECT_NAME！"
 }
 
@@ -412,8 +416,8 @@ copy_log_file() {
 
 # 主程序
 main() {
-    setup_project
     create_directories
+    setup_project
     copy_files
     setup_port
     bind_website
@@ -448,6 +452,7 @@ main() {
 
 # 重启后执行的程序
 main_reboot() {
+    create_directories
     print_color $BLUE "重启后执行的程序..."
     start_time=$(date '+%Y-%m-%d %H:%M:%S')
     log_message "重启后执行的程序完成,开始时间: $start_time"
