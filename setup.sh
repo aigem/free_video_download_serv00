@@ -14,6 +14,7 @@ NODE_Version="20"
 
 # 设置项目
 setup_project() {
+    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     print_color $BLUE "开始设置项目..."
     print_color $BLUE "本项目：$PROJECT_NAME"
     print_color $BLUE "使用框架：$DEFAULT_FRAMEWORK"
@@ -21,8 +22,11 @@ setup_project() {
     print_color $BLUE "GIT仓库目录：$GIT_REPO_DIR"
     print_color $BLUE "NODE版本：$NODE_Version"
     print_color $BLUE "如需修改，请在setup.sh中修改默认配置"
+    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     
     # 默认配置 一般不改
+    USER_NAME="$(whoami)"
+    USER_HOME="/usr/home/$USER_NAME"
     BASH_PROFILE="$USER_HOME/.bash_profile"
     devil binexec on
     USER_HOME="/usr/home/$(whoami)"

@@ -30,8 +30,8 @@ serv00_base 是一个为 serv00 免费主机设计的自动化部署工具。它
 
 2. 克隆仓库并运行安装脚本：
    ```bash
-   git clone https://github.com/你的用户名/serv00_base.git
-   cd serv00_base
+   git clone https://github.com/aigem/free_video_download_serv00.git
+   cd free_video_download_serv00
    bash setup.sh main
    ```
 
