@@ -55,17 +55,18 @@ print_color() {
     echo -e "${color}${message}${NC}"
 }
 
-# 记录日志
-log_message() {
-    local message=$1
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$setup_log"
-}
-
 # 创建目录
 create_directories() {
     print_color $BLUE "创建必要的目录..."
     mkdir -p "$USER_HOME/$PROJECT_NAME"
     log_message "新建目录: $USER_HOME/$PROJECT_NAME"
+    touch "$setup_log"
+}
+
+# 记录日志
+log_message() {
+    local message=$1
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$setup_log"
 }
 
 # 复制同文件夹下的src文件夹的所有内容-必须
