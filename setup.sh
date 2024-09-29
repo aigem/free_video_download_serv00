@@ -12,6 +12,15 @@ GIT_REPO="https://github.com/saotv/cobalt.git"
 GIT_REPO_DIR="cobalt"
 NODE_Version="20"
 
+# 创建目录
+create_directories() {
+    print_color $BLUE "创建必要的目录..."
+    mkdir -p "$USER_HOME/$PROJECT_NAME"
+    touch "$setup_log"
+    log_message "新建目录: $USER_HOME/$PROJECT_NAME"
+    
+}
+
 # 设置项目
 setup_project() {
     print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -53,14 +62,6 @@ print_color() {
     local color=$1
     local message=$2
     echo -e "${color}${message}${NC}"
-}
-
-# 创建目录
-create_directories() {
-    print_color $BLUE "创建必要的目录..."
-    mkdir -p "$USER_HOME/$PROJECT_NAME"
-    log_message "新建目录: $USER_HOME/$PROJECT_NAME"
-    touch "$setup_log"
 }
 
 # 记录日志
