@@ -11,25 +11,26 @@ DEFAULT_FRAMEWORK="nodejs"
 GIT_REPO="https://github.com/saotv/cobalt.git"
 GIT_REPO_DIR="cobalt"
 NODE_Version="20"
-setup_log="$USER_HOME/$PROJECT_NAME/setup_log.txt"
+setup_log="/usr/home/$(whoami)/$PROJECT_NAME/setup_log.txt"
 
 # 创建目录
 create_directories() {
-    print_color $BLUE "创建必要的目录..."
-    if [ ! -d "$USER_HOME/$PROJECT_NAME" ]; then
-        mkdir -p "$USER_HOME/$PROJECT_NAME"
+    print_color $BLUE "开始设置项目..."
+    print_color $YELLOW "创建必要的目录..."
+    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    if [ ! -d "/usr/home/$(whoami)/$PROJECT_NAME" ]; then
+        mkdir -p "/usr/home/$(whoami)/$PROJECT_NAME"
     fi
     if [ ! -d "$setup_log" ]; then
         touch "$setup_log"
     fi
-    log_message "新建目录: $USER_HOME/$PROJECT_NAME"
+    log_message "新建目录: /usr/home/$(whoami)/$PROJECT_NAME"
     
 }
 
 # 设置项目
 setup_project() {
-    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-    print_color $BLUE "开始设置项目..."
     print_color $BLUE "本项目：$PROJECT_NAME"
     print_color $BLUE "使用框架：$DEFAULT_FRAMEWORK"
     print_color $BLUE "GIT仓库：$GIT_REPO"
@@ -76,6 +77,7 @@ log_message() {
 
 # 复制同文件夹下的src文件夹的所有内容-必须
 copy_files() {
+    mkdir -p "$USER_HOME/$PROJECT_NAME/src/"
     cp -r src/* "$USER_HOME/$PROJECT_NAME/src/"
     cp "$0" "$USER_HOME/$PROJECT_NAME/src/setup.sh"
     chmod +x "$USER_HOME/$PROJECT_NAME/src/setup.sh"
@@ -86,6 +88,7 @@ copy_files() {
 setup_port() {
     print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     print_color $BLUE "【设置 $PROJECT_NAME 端口】你的端口号为: "
+    devil www list
     devil port list
 
     while true; do
@@ -110,7 +113,6 @@ setup_port() {
     log_message "设置端口: $app_PORT"
     print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     print_color $BLUE "你的程序必须以以端口: $app_PORT 启动"
-    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 }
 
 # 绑定网站
@@ -118,6 +120,7 @@ bind_website() {
     print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     print_color $BLUE "现需要绑定网站并指向 $app_PORT"
     print_color $RED "警告：这将会重置网站（删除该网站所有内容）！"
+    devil www list
     echo "输入 'yes' 来重置网站 ($(whoami).serv00.net)"
     echo "或输入自定义域名,必须A记录解析到本机IP"
     read -p "或输入 'no' 退出绑定，之后可自行在网页端后台进行设置: " user_input
@@ -144,7 +147,9 @@ bind_website() {
             devil www del "$custom_domain"
             ADD_WWW_OUTPUT=$(devil www add "$custom_domain" proxy localhost "$app_PORT")
             if echo "$ADD_WWW_OUTPUT" | grep -q "Domain added succesfully"; then
+                print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
                 print_color $GREEN "网站 $custom_domain 成功绑定。"
+                print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
                 MY_SITE="$custom_domain"
             else
                 print_color $RED "绑定网站失败，域名是否解析到本机IP。你之后可自行在网页端后台进行设置"
@@ -158,12 +163,17 @@ bind_website() {
 # 设置nodejs环境
 setup_nodejs_env() {
     print_color $BLUE "设置 nodejs 环境..."
-    mkdir ~/.npm-global
+    if [ ! -d "$USER_HOME/.npm-global" ]; then
+        mkdir ~/.npm-global
+    fi
     npm config set prefix '~/.npm-global' 
     echo 'export PATH=~/.npm-global/bin:~/bin:$PATH ' >> $USER_HOME/.bash_profile
     source $USER_HOME/.bash_profile
-    mkdir -p ~/bin && ln -fs /usr/local/bin/node$NODE_Version ~/bin/node && ln -fs /usr/local/bin/npm$NODE_Version ~/bin/npm && source $USER_HOME/.bash_profile
-    source $USER_HOME/.bash_profile
+
+    if [ ! -d "$USER_HOME/bin" ]; then
+        mkdir -p ~/bin 
+    fi
+    ln -fs /usr/local/bin/node$NODE_Version ~/bin/node && ln -fs /usr/local/bin/npm$NODE_Version ~/bin/npm && source $USER_HOME/.bash_profile
     log_message "nodejs 环境设置完成"
     print_color $BLUE "请使用 npm install -g 来安装 各种依赖"
 
@@ -179,7 +189,7 @@ setup_nodejs_env() {
 
 # 安装 pm2 仅检查文件是否存在并不能保证 PM2 正确安装。建议添加一个版本检查，例如 pm2 --version
 install_pm2() {
-    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    
     if [ ! -f "$USER_HOME/.npm-global/bin/pm2" ]; then
         print_color $GREEN "正在安装 PM2..."
         npm install pm2 -g || {
@@ -188,7 +198,9 @@ install_pm2() {
             exit 1
         }
     else
+        print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
         print_color $GREEN "PM2 已安装。"
+        print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     fi
     log_message "PM2 安装检查完成"
     pm2 --version
@@ -224,7 +236,9 @@ python_virtual_env() {
     pip install -r "$USER_HOME/$PROJECT_NAME/src/requirements.txt"
 
     cd "$CURRENT_DIR"
+    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     log_message "虚拟环境设置完成"
+    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 }
 
 # Git下载应用
@@ -291,21 +305,21 @@ update_bash_profile() {
     PM2_PATH=$(which pm2)
     if [ -f "$BASH_PROFILE" ]; then
         # 删除旧的环境变量
-        sed -i.bak '/export PATH="$PM2_PATH/d' "$BASH_PROFILE"
-        sed -i.bak '/export PATH="$VIRTUAL_ENV_PATH/bin:$PATH"/d' "$BASH_PROFILE"
-        sed -i.bak '/export PATH=~/.npm-global/bin:~/bin:$PATH/d' "$BASH_PROFILE"
+        sed -i.bak '/export PATH=.*PM2_PATH/d' "$BASH_PROFILE"
+        sed -i.bak '/export PATH=.*VIRTUAL_ENV_PATH/d' "$BASH_PROFILE"
+        sed -i.bak '/export PATH=.*\.npm-global\/bin/d' "$BASH_PROFILE"
     fi
 
     {
         # 检查以下目录是否存在，存在的才添加到环境变量
-        if [ -d "~/.npm-global/bin" ]; then
-            echo 'export PATH=~/.npm-global/bin:~/bin:$PATH ' >> "$BASH_PROFILE"
+        if [ -d "$HOME/.npm-global/bin" ]; then
+            echo 'export PATH="$HOME/.npm-global/bin:$HOME/bin:$PATH"'
         fi
         if [ -d "$VIRTUAL_ENV_PATH/bin" ]; then
-            echo "export PATH=\"$VIRTUAL_ENV_PATH/bin:\$PATH\"" >> "$BASH_PROFILE"
+            echo "export PATH=\"$VIRTUAL_ENV_PATH/bin:\$PATH\""
         fi
-        if [ -d "$PM2_PATH" ]; then
-            echo "export PATH=\"$PM2_PATH:\$PATH\"" >> "$BASH_PROFILE"
+        if [ -n "$PM2_PATH" ]; then
+            echo "export PATH=\"$(dirname "$PM2_PATH"):\$PATH\""
         fi
     } >> "$BASH_PROFILE"
 
