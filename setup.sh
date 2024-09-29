@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # serv00_base 重启脚本
-# 版本: 2.0.0
+# 版本: 2.2.0
 # 描述: 用于在系统重启后自动启动应用程序
 
 
@@ -72,7 +72,7 @@ print_color() {
 # 记录日志
 log_message() {
     local message=$1
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$setup_log"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" | iconv -f UTF-8 -t UTF-8 >> "$setup_log"
 }
 
 # 复制同文件夹下的src文件夹的所有内容-必须
@@ -82,6 +82,11 @@ copy_files() {
     cp "$0" "$USER_HOME/$PROJECT_NAME/src/setup.sh"
     chmod +x "$USER_HOME/$PROJECT_NAME/src/setup.sh"
     log_message "复制文件完成"
+    #列出所有文件
+    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    print_color $BLUE "复制文件完成，列出所有文件: "
+    ls -l "$USER_HOME/$PROJECT_NAME/src/"
+    print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 }
 
 # 设置端口
@@ -207,6 +212,34 @@ install_pm2() {
     log_message "PM2 版本检查完成"
 }
 
+# 添加环境变量到.bash_profile
+update_bash_profile() {
+    print_color $BLUE "更新 .bash_profile..."
+    PM2_PATH=$(which pm2)
+    if [ -f "$BASH_PROFILE" ]; then
+        # 删除旧的环境变量
+        sed -i.bak '/export PATH=.*PM2_PATH/d' "$BASH_PROFILE"
+        sed -i.bak '/export PATH=.*VIRTUAL_ENV_PATH/d' "$BASH_PROFILE"
+        sed -i.bak '/export PATH=.*\.npm-global\/bin/d' "$BASH_PROFILE"
+    fi
+
+    {
+        # 检查以下目录是否存在，存在的才添加到环境变量
+        if [ -d "$HOME/.npm-global/bin" ]; then
+            echo 'export PATH="$HOME/.npm-global/bin:$HOME/bin:$PATH"'
+        fi
+        if [ -d "$VIRTUAL_ENV_PATH/bin" ]; then
+            echo "export PATH=\"$VIRTUAL_ENV_PATH/bin:\$PATH\""
+        fi
+        if [ -n "$PM2_PATH" ]; then
+            echo "export PATH=\"$(dirname "$PM2_PATH"):\$PATH\""
+        fi
+    } >> "$BASH_PROFILE"
+
+    source "$BASH_PROFILE"
+    log_message "添加环境变量到.bash_profile 完成"
+}
+
 # 设置python虚拟环境
 python_virtual_env() {
     print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="    
@@ -243,16 +276,22 @@ python_virtual_env() {
 
 # Git下载应用
 git_clone() {
-    # 如果 GIT_REPO 不为空，则 git clone
     if [ -n "$GIT_REPO" ]; then
-        print_color $BLUE "git clone 项目..."
-        # 如果 GIT_REPO_DIR 不为空，则 git clone 到 GIT_REPO_DIR 目录
+        print_color $BLUE "正在更新或克隆项目..."
+        target_dir="$USER_HOME/$PROJECT_NAME"
         if [ -n "$GIT_REPO_DIR" ]; then
-            git clone $GIT_REPO "$USER_HOME/$PROJECT_NAME/$GIT_REPO_DIR"
-        else
-            git clone $GIT_REPO "$USER_HOME/$PROJECT_NAME"
+            target_dir="$target_dir/$GIT_REPO_DIR"
         fi
-        log_message "git clone 项目完成"
+
+        if [ -d "$target_dir/.git" ]; then
+            cd "$target_dir"
+            git pull
+            log_message "项目更新完成"
+        else
+            rm -rf "$target_dir"
+            git clone $GIT_REPO "$target_dir"
+            log_message "项目克隆完成"
+        fi
     fi
 }
 
@@ -270,12 +309,17 @@ prepare_application() {
     pnpm install
     log_message "应用安装依赖完成"
 
-    # 将 src/.env.example 复制为 .env，并用MY_WEB_URL MY_WEB_PORT MY_WEB_NAME 替换 .env 中的 [MY_WEB_URL] [MY_WEB_PORT] [MY_WEB_NAME]
-    cp $USER_HOME/$PROJECT_NAME/src/.env.example $USER_HOME/$PROJECT_NAME/$GIT_REPO_DIR/api/.env
-    sed -i "s|[MY_WEB_URL]|$MY_SITE|" $USER_HOME/$PROJECT_NAME/$GIT_REPO_DIR/api/.env
-    sed -i "s|[MY_WEB_PORT]|$app_PORT|" $USER_HOME/$PROJECT_NAME/$GIT_REPO_DIR/api/.env
-    sed -i "s|[MY_WEB_NAME]|$PROJECT_NAME|" $USER_HOME/$PROJECT_NAME/$GIT_REPO_DIR/api/.env
+    # 生成 .env 文件
+    cat > "$USER_HOME/$PROJECT_NAME/$GIT_REPO_DIR/api/.env" << EOF
+API_URL=$MY_SITE
+API_PORT=$app_PORT
+API_NAME=$PROJECT_NAME
+DURATION_LIMIT=4800
+EOF
     log_message "应用配置文件生成完成"
+
+    # 定义 PM2_START_COMMANDS
+    PM2_START_COMMANDS="npm -- run start"
 }
 
 # 启动应用
@@ -297,34 +341,6 @@ start_application() {
     
     pm2 save
     log_message "应用启动成功，PM2 配置已保存"
-}
-
-# 添加环境变量到.bash_profile，
-update_bash_profile() {
-    print_color $BLUE "更新 .bash_profile..."
-    PM2_PATH=$(which pm2)
-    if [ -f "$BASH_PROFILE" ]; then
-        # 删除旧的环境变量
-        sed -i.bak '/export PATH=.*PM2_PATH/d' "$BASH_PROFILE"
-        sed -i.bak '/export PATH=.*VIRTUAL_ENV_PATH/d' "$BASH_PROFILE"
-        sed -i.bak '/export PATH=.*\.npm-global\/bin/d' "$BASH_PROFILE"
-    fi
-
-    {
-        # 检查以下目录是否存在，存在的才添加到环境变量
-        if [ -d "$HOME/.npm-global/bin" ]; then
-            echo 'export PATH="$HOME/.npm-global/bin:$HOME/bin:$PATH"'
-        fi
-        if [ -d "$VIRTUAL_ENV_PATH/bin" ]; then
-            echo "export PATH=\"$VIRTUAL_ENV_PATH/bin:\$PATH\""
-        fi
-        if [ -n "$PM2_PATH" ]; then
-            echo "export PATH=\"$(dirname "$PM2_PATH"):\$PATH\""
-        fi
-    } >> "$BASH_PROFILE"
-
-    source "$BASH_PROFILE"
-    log_message "添加环境变量到.bash_profile 完成"
 }
 
 # 生成配置文件
@@ -353,6 +369,7 @@ GIT_REPO="$GIT_REPO"
 GIT_REPO_DIR="$GIT_REPO_DIR"
 NODE_Version="$NODE_Version"
 NODE_PATH="$USER_HOME/node_modules/pm2/bin:$PATH"
+PM2_START_COMMANDS="$PM2_START_COMMANDS"
 EOF
     log_message "配置文件生成: $CONFIG_FILE"
 }
@@ -432,36 +449,48 @@ copy_log_file() {
 main() {
     create_directories
     setup_project
+    sleep 15
     copy_files
     setup_port
+    sleep 5
     bind_website
+    sleep 5
     setup_nodejs_env
+    sleep 5
     install_pm2
+    sleep 5
     update_bash_profile
+    sleep 5
     git_clone
+    sleep 5
     prepare_application
+    sleep 5
     start_application
+    sleep 5
     generate_config_file
+    sleep 5
     setup_reboot_script
-
+    sleep 5
     # 检查安装状态
     if check_installation_status; then
         print_color $GREEN "安装成功!"
     else
         print_color $RED "安装失败，请检查日志文件。http://$MY_SITE/info.html"
     fi
-
+    sleep 5
     # 无论成功与否，都生成 info.html
     generate_info_html
 
     print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-    print_color $GREEN "安装流程完成。请访问 http://$MY_SITE 查看详细信息。"
+    print_color $GREEN "安装流程完成。请访问 http://$MY_SITE/info.html 查看详细信息。"
     print_color $YELLOW "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
     cd "$USER_HOME/$PROJECT_NAME"
     log_message "安装流程完成"
 
     copy_log_file
+    sleep 5
+    exit 0
 }
 
 # 重启后执行的程序
@@ -497,7 +526,7 @@ main_reboot() {
     
     # 无论成功与否，都生成 info.html
     generate_info_html
-    log_message "重启后秤生成 info.html"
+    log_message "重启后生成 info.html"
 
     cd "$USER_HOME/$PROJECT_NAME"
 
@@ -505,6 +534,8 @@ main_reboot() {
     log_message "重启后执行的程序完成,结束时间: $end_time"
 
     copy_log_file
+    sleep 5
+    exit 0
 }
 
 # 执行程序
