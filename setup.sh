@@ -1,17 +1,13 @@
 #!/bin/bash
 
-# serv00_base 重启脚本
-# 版本: 2.2.0
-# 描述: 用于在系统重启后自动启动应用程序
-
-
 # 默认配置
 PROJECT_NAME="videodown"
 DEFAULT_FRAMEWORK="nodejs"
-GIT_REPO="https://github.com/saotv/cobalt.git"
+GIT_REPO="https://github.com/imputnet/cobalt.git"
 GIT_REPO_DIR="cobalt"
 NODE_Version="20"
 setup_log="/usr/home/$(whoami)/$PROJECT_NAME/setup_log.txt"
+DURATION_LIMIT=4800
 
 # 创建目录
 create_directories() {
@@ -44,7 +40,6 @@ setup_project() {
     USER_HOME="/usr/home/$USER_NAME"
     BASH_PROFILE="$USER_HOME/.bash_profile"
     devil binexec on
-    USER_HOME="/usr/home/$(whoami)"
     CONFIG_FILE="$USER_HOME/$PROJECT_NAME/src/config.sh"
     REBOOT_SCRIPT_PATH="$USER_HOME/$PROJECT_NAME/src/reboot_run.sh"
     VIRTUAL_ENV_PATH="$USER_HOME/$PROJECT_NAME/venv_$PROJECT_NAME"
@@ -314,12 +309,9 @@ prepare_application() {
 API_URL=$MY_SITE
 API_PORT=$app_PORT
 API_NAME=$PROJECT_NAME
-DURATION_LIMIT=4800
+DURATION_LIMIT=$DURATION_LIMIT
 EOF
     log_message "应用配置文件生成完成"
-
-    # 定义 PM2_START_COMMANDS
-    PM2_START_COMMANDS="npm -- run start"
 }
 
 # 启动应用
@@ -327,20 +319,18 @@ start_application() {
     print_color $GREEN "使用 PM2 启动应用..."
     PM2_START_COMMANDS="npm -- run start"
     pm2 start "$PM2_START_COMMANDS" --name "$PROJECT_NAME"
-    
-    sleep 10
+    sleep 15
 
     if pm2 list | grep -q "$PROJECT_NAME"; then
         print_color $GREEN "=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-        print_color $GREEN "$PROJECT_NAME 已成功启动。"   
+        print_color $GREEN "$PROJECT_NAME 已成功启动。"
+        pm2 save
+        log_message "应用启动成功，PM2 配置已保存"
     else
         print_color $RED "$PROJECT_NAME 启动失败，请检查配置。"
         log_message "$PROJECT_NAME 启动失败"
         exit 1
     fi
-    
-    pm2 save
-    log_message "应用启动成功，PM2 配置已保存"
 }
 
 # 生成配置文件
@@ -448,36 +438,38 @@ copy_log_file() {
 # 主程序
 main() {
     create_directories
+
     setup_project
-    sleep 15
+
     copy_files
+    
     setup_port
-    sleep 5
+
     bind_website
-    sleep 5
+
     setup_nodejs_env
-    sleep 5
+
     install_pm2
-    sleep 5
+
     update_bash_profile
-    sleep 5
+
     git_clone
-    sleep 5
+
     prepare_application
-    sleep 5
+
     start_application
-    sleep 5
+
     generate_config_file
-    sleep 5
+
     setup_reboot_script
-    sleep 5
+
     # 检查安装状态
     if check_installation_status; then
         print_color $GREEN "安装成功!"
     else
         print_color $RED "安装失败，请检查日志文件。http://$MY_SITE/info.html"
     fi
-    sleep 5
+
     # 无论成功与否，都生成 info.html
     generate_info_html
 
@@ -489,52 +481,37 @@ main() {
     log_message "安装流程完成"
 
     copy_log_file
-    sleep 5
+
     exit 0
 }
 
 # 重启后执行的程序
 main_reboot() {
     create_directories
-    print_color $BLUE "重启后执行的程序..."
     start_time=$(date '+%Y-%m-%d %H:%M:%S')
-    log_message "重启后执行的程序完成,开始时间: $start_time"
+    # 直接写入日志
+    echo "重启后执行的程序完成,开始时间: $start_time" >> "$setup_log"
+
     setup_project
     update_bash_profile
     pm2 resurrect
     pm2 start all
-    log_message "重启后PM2尝试启动"
-
-    # 检查安装状态
-    if check_installation_status; then
-        log_message "重启后安装状态检查,启动成功"
+    # 如何判断是否resurrect成功
+    sleep 15
+    if pm2 list | grep -q "$PROJECT_NAME"; then
+        log_message "重启后PM2尝试启动成功"
     else
-        log_message "重启后安装状态检查,启动失败，重试"
-        setup_nodejs_env
-        install_pm2
-        update_bash_profile
-        pm2 resurrect
-        pm2 start all
-        log_message "再次尝试启动完成"
-        # 再次检查安装状态
-        if check_installation_status; then
-            log_message "再次尝试启动完成"
-        else
-            log_message "再次尝试启动失败，请检查日志文件或查看README.md"
-        fi
+        start_application
     fi
     
     # 无论成功与否，都生成 info.html
     generate_info_html
-    log_message "重启后生成 info.html"
-
-    cd "$USER_HOME/$PROJECT_NAME"
 
     end_time=$(date '+%Y-%m-%d %H:%M:%S')
     log_message "重启后执行的程序完成,结束时间: $end_time"
 
     copy_log_file
-    sleep 5
+
     exit 0
 }
 
