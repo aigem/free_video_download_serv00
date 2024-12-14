@@ -321,6 +321,8 @@ EOF
 start_application() {
     print_color $GREEN "使用 PM2 启动应用..."
     PM2_START_COMMANDS="npm -- run start"
+    # 如果PM2中已经有目标应用，则先删除
+    pm2 delete "$PROJECT_NAME"
     pm2 start "$PM2_START_COMMANDS" --name "$PROJECT_NAME"
     sleep 15
 
@@ -364,6 +366,8 @@ NODE_Version="$NODE_Version"
 NODE_PATH="$USER_HOME/node_modules/pm2/bin:$PATH"
 PM2_START_COMMANDS="$PM2_START_COMMANDS"
 MY_SITE="$MY_SITE"
+SETUP_LOG="$setup_log"
+REBOOT_LOG="$reboot_log"
 EOF
     log_message "配置文件生成: $CONFIG_FILE"
 }
@@ -374,11 +378,13 @@ setup_reboot_script() {
 
     if ! crontab -l | grep -q "$USER_HOME/$PROJECT_NAME/src/setup.sh main_reboot"; then
         (crontab -l 2>/dev/null; echo "@reboot $USER_HOME/$PROJECT_NAME/src/setup.sh main_reboot") | crontab -
+        log_message "重启脚本设置完成"
     fi
+    
     if ! crontab -l | grep -q "$USER_HOME/$PROJECT_NAME/src/setup.sh check_30"; then
         (crontab -l 2>/dev/null; echo "*/30 * * * * $USER_HOME/$PROJECT_NAME/src/setup.sh check_30") | crontab -
+        log_message "半小时check一次脚本设置完成"
     fi
-    log_message "重启脚本设置完成"
 }
 
 # 检查程序PM2启动状态
