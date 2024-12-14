@@ -6,8 +6,9 @@ DEFAULT_FRAMEWORK="nodejs"
 GIT_REPO="https://github.com/imputnet/cobalt.git"
 GIT_REPO_DIR="cobalt"
 NODE_Version="20"
-setup_log="/usr/home/$(whoami)/$PROJECT_NAME/setup_log.txt"
 DURATION_LIMIT=4800
+setup_log="/usr/home/$(whoami)/$PROJECT_NAME/setup_log.txt"
+reboot_log="/usr/home/$(whoami)/$PROJECT_NAME/reboot_log.txt"
 
 # 创建目录
 create_directories() {
@@ -20,6 +21,9 @@ create_directories() {
     fi
     if [ ! -d "$setup_log" ]; then
         touch "$setup_log"
+    fi
+    if [ ! -d "$reboot_log" ]; then
+        touch "$reboot_log"
     fi
     log_message "新建目录: /usr/home/$(whoami)/$PROJECT_NAME"
     
@@ -41,7 +45,6 @@ setup_project() {
     BASH_PROFILE="$USER_HOME/.bash_profile"
     devil binexec on
     CONFIG_FILE="$USER_HOME/$PROJECT_NAME/src/config.sh"
-    REBOOT_SCRIPT_PATH="$USER_HOME/$PROJECT_NAME/src/reboot_run.sh"
     VIRTUAL_ENV_PATH="$USER_HOME/$PROJECT_NAME/venv_$PROJECT_NAME"
     
     log_message "项目设置完成，开始一键安装$PROJECT_NAME！"
@@ -360,6 +363,7 @@ GIT_REPO_DIR="$GIT_REPO_DIR"
 NODE_Version="$NODE_Version"
 NODE_PATH="$USER_HOME/node_modules/pm2/bin:$PATH"
 PM2_START_COMMANDS="$PM2_START_COMMANDS"
+MY_SITE="$MY_SITE"
 EOF
     log_message "配置文件生成: $CONFIG_FILE"
 }
@@ -370,6 +374,9 @@ setup_reboot_script() {
 
     if ! crontab -l | grep -q "$USER_HOME/$PROJECT_NAME/src/setup.sh main_reboot"; then
         (crontab -l 2>/dev/null; echo "@reboot $USER_HOME/$PROJECT_NAME/src/setup.sh main_reboot") | crontab -
+    fi
+    if ! crontab -l | grep -q "$USER_HOME/$PROJECT_NAME/src/setup.sh check_30"; then
+        (crontab -l 2>/dev/null; echo "*/30 * * * * $USER_HOME/$PROJECT_NAME/src/setup.sh check_30") | crontab -
     fi
     log_message "重启脚本设置完成"
 }
@@ -481,49 +488,64 @@ main() {
     log_message "安装流程完成"
 
     copy_log_file
-
-    exit 0
 }
 
 # 重启后执行的程序
 main_reboot() {
     create_directories
     start_time=$(date '+%Y-%m-%d %H:%M:%S')
-    # 直接写入日志
-    echo "重启后执行的程序完成,开始时间: $start_time" >> "$setup_log"
+    echo "重启后执行的程序开始时间: $start_time"
+    echo "重启后执行的程序完成,开始时间: $start_time" >> "$reboot_log"
 
     setup_project
     update_bash_profile
     pm2 resurrect
-    pm2 start all
     # 如何判断是否resurrect成功
     sleep 15
     if pm2 list | grep -q "$PROJECT_NAME"; then
-        log_message "重启后PM2尝试启动成功"
+        echo "重启后PM2尝试启动成功" >> "$reboot_log"
     else
         start_application
     fi
-    
-    # 无论成功与否，都生成 info.html
-    generate_info_html
+    echo "重启后PM2尝试启动所有应用"
+    pm2 start all
 
     end_time=$(date '+%Y-%m-%d %H:%M:%S')
-    log_message "重启后执行的程序完成,结束时间: $end_time"
+    echo "重启后执行的程序完成,结束时间: $end_time" >> "$reboot_log"
+    echo "reboot 完成"
+    echo "reboot 完成" >> "$reboot_log"
+}
 
-    copy_log_file
-
-    exit 0
+# 半小时check一次
+check_30() {
+    echo "开始检查 $PROJECT_NAME 启动状态"
+    # 检查pm2中目标应用是否启动
+    if pm2 list | grep -q "$PROJECT_NAME"; then
+        pm2 start all
+        echo "应用启动成功"
+    else
+        echo "应用启动失败"
+        /usr/home/$(whoami)/$PROJECT_NAME/src/setup.sh main_reboot
+    fi
+    echo "检查应用启动状态完成"
+    echo "半小时check一次 检查时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "$reboot_log"
 }
 
 # 执行程序
 case "$1" in
   main)
     main
+    exit 0
     ;;
   main_reboot)  
     main_reboot
+    exit 0
+    ;;
+  check_30)
+    check_30
+    exit 0
     ;;
   *)
-    echo "Usage: $0 {main|main_reboot}"
+    echo "Usage: $0 {main|main_reboot|check_30}"
     exit 1
 esac
