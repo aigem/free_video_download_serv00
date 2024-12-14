@@ -380,7 +380,7 @@ setup_reboot_script() {
         (crontab -l 2>/dev/null; echo "@reboot $USER_HOME/$PROJECT_NAME/src/setup.sh main_reboot") | crontab -
         log_message "重启脚本设置完成"
     fi
-    
+
     if ! crontab -l | grep -q "$USER_HOME/$PROJECT_NAME/src/setup.sh check_30"; then
         (crontab -l 2>/dev/null; echo "*/30 * * * * $USER_HOME/$PROJECT_NAME/src/setup.sh check_30") | crontab -
         log_message "半小时check一次脚本设置完成"
